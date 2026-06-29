@@ -1,5 +1,3 @@
-const Stripe = require('stripe');
-
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
@@ -24,21 +22,37 @@ exports.handler = async (event) => {
       return { statusCode: 500, body: JSON.stringify({ error: 'Stripe environment variables are missing' }) };
     }
 
-    const stripe = Stripe(stripeSecretKey);
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      customer_email: email,
-      line_items: [{ price: priceId, quantity: 1 }],
-      success_url: siteUrl + '/?payment=success&session_id={CHECKOUT_SESSION_ID}',
-      cancel_url: siteUrl + '/?payment=cancelled',
-      metadata: {
-        email,
-        name: name || '',
-        mbtiType,
-        pdfFile,
-        paymentMethod: paymentMethod || 'card'
-      }
+    const params = new URLSearchParams();
+    params.append('mode', 'payment');
+    params.append('customer_email', email);
+    params.append('line_items[0][price]', priceId);
+    params.append('line_items[0][quantity]', '1');
+    params.append('success_url', siteUrl + '/?payment=success&session_id={CHECKOUT_SESSION_ID}');
+    params.append('cancel_url', siteUrl + '/?payment=cancelled');
+    params.append('metadata[email]', email);
+    params.append('metadata[name]', name || '');
+    params.append('metadata[mbtiType]', mbtiType);
+    params.append('metadata[pdfFile]', pdfFile);
+    params.append('metadata[paymentMethod]', paymentMethod || 'card');
+
+    const stripeResponse = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + stripeSecretKey,
+        'Content-Type': 'application/x-www-form-urlencoded'
+      },
+      body: params.toString()
     });
+
+    const session = await stripeResponse.json();
+
+    if (!stripeResponse.ok) {
+      return {
+        statusCode: 500,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ error: session.error?.message || 'Stripe checkout could not be created' })
+      };
+    }
 
     return {
       statusCode: 200,
