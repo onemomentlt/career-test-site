@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "start": "netlify dev"
+  },
+  "dependencies": {
+    "stripe": "^16.12.0"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.38.1"
+  }
+}
